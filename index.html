@@ -1,0 +1,130 @@
+<html>
+<canvas id='cnvs' width=800 height=600 style='border: 1px solid black'></canvas>
+<br>
+<input type='range' oninput='i=parseFloat(this.value)**2;draw();' style='width:600'
+min=0 max=15 step=0.1 value=0></input>t
+<br>
+<input type='range' oninput='r=parseFloat(this.value);calc();draw();' style='width:600'
+min=5 max=90 step=0.1 value=50></input>r
+<br>
+<input type='range' oninput='M1=parseFloat(this.value);calc();draw();' style='width:600'
+min=0 max=5 step=0.2 value=1></input>m1
+<br>
+<input type='range' oninput='M2=parseFloat(this.value);calc();draw();' style='width:600'
+min=0 max=5 step=0.2 value=3></input>m2
+<br>
+<input type='range' oninput='V1=parseFloat(this.value);calc();draw();' style='width:600'
+min=0 max=10 step=0.2 value=6></input>v1
+<br>
+<input type='range' oninput='V2=parseFloat(this.value);calc();draw();' style='width:600'
+min=0 max=10 step=0.2 value=2></input>v2
+<br>
+ZM frame?<input type='checkbox' oninput='ZM_frame=this.checked;calc();draw();'></input>
+<div id='info'></div>
+<hr>
+Convert to ZM frame and then bring m2 (initially 3) down to m1 (initially 1).
+Should see that the orbit is no longer bound in this frame. Note that for
+circular orbits, should have v1=(alpha)v2 and opposite for masses and then the
+radius, r, can be calculated (simulation uses G=800 in these units - for setup
+gives that r=50 for circular binary system).
+
+Note that all orbits should be perfect circles / elipses, but errors in
+numerical approximation lead to slightly varying radii occassionally that look
+like spirals (i.e. when power law not exactly 1/r^2 effectively).
+<script>
+let r = 50;
+let V1 = 6;
+let V2 = 2;
+let M1 = 1;
+let M2 = 3;
+let ZM_frame = false;
+var states, masses, dt;
+function calc() {
+    masses = [{
+        x: -r/2,
+        y: 0,
+        vx: 0,
+        vy: -V1,
+        m: M1
+    },
+    {
+        x: r/2,
+        y: 0,
+        vx: 0,
+        vy: V2,
+        m: M2
+    }];
+
+    if (ZM_frame){
+        vzm = (masses[0].m*masses[0].vy + masses[1].m*masses[1].vy)/(masses[0].m+masses[1].m);
+        masses[0].vy -= vzm;
+        masses[1].vy -= vzm;
+    }
+    document.getElementById('info').innerText = 
+    `r=${r}, m1=${M1}, m2=${M2}, v1=${V1}, v2=${V2}`;
+
+    states = [masses];
+    dt = 0.001;
+    for (let t = 0; t < 225; t+= dt){
+        let m1 = states[states.length-1][0];
+        let m2 = states[states.length-1][1];
+        let r = Math.sqrt((m1.x-m2.x)**2 + (m2.y-m1.y)**2);
+        let F = 800*m1.m * m2.m / r**2;
+        states.push([{
+            // use s = s0 + ut + (1/2) at^2 (resolved)
+            x: m1.x + m1.vx*dt + (1/2)*(F/m1.m)*dt**2*(m2.x-m1.x)/r,
+            y: m1.y + m1.vy*dt + (1/2)*(F/m1.m)*dt**2*(m2.y-m1.y)/r,
+            // use v = u + at
+            vx: m1.vx + (F/m1.m) * (m2.x-m1.x)/r *dt,
+            vy: m1.vy + (F/m1.m) * (m2.y-m1.y)/r *dt,
+            m: m1.m
+            },{
+            x: m2.x + m2.vx*dt + (1/2)*(F/m2.m)*dt**2*(m1.x-m2.x)/r,
+            y: m2.y + m2.vy*dt + (1/2)*(F/m2.m)*dt**2*(m1.y-m2.y)/r,
+            vx: m2.vx + (F/m2.m) * (m1.x-m2.x)/r *dt,
+            vy: m2.vy + (F/m2.m) * (m1.y-m2.y)/r *dt,
+            m: m2.m
+            }
+        ]);
+    }
+}
+
+calc();
+
+
+let i = 0;
+scale = 5;
+ctx = document.getElementById('cnvs').getContext('2d');
+function draw(){
+    ctx.clearRect(0,0,cnvs.width,cnvs.height);
+    for (let m of states[parseInt(i/dt)]) {
+        ctx.beginPath();
+        ctx.arc(
+            cnvs.width/2+m.x*scale,
+            cnvs.height/2 -m.y*scale,
+            10*m.m,
+            0, 2*Math.PI
+        );
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cnvs.width/2 + m.x*scale,
+            cnvs.height/2 - m.y*scale);
+        ctx.lineTo(cnvs.width/2 + (m.x + m.vx) * scale,
+            cnvs.height/2 - (m.y + m.vy) * scale);
+        ctx.stroke();
+    }
+    for (let k of [0,1]) {
+        ctx.beginPath();
+        for (let j = parseInt(i/dt); j < states.length; j+=1/dt*1/10) {
+            m = states[j][k];
+            ctx.lineTo(cnvs.width/2+m.x*scale,
+                cnvs.height/2-m.y*scale
+            );
+        }
+        ctx.stroke()
+    }
+}
+draw();
+
+</script>
+</html>
